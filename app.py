@@ -5,57 +5,6 @@ import json
 import os
 import google.generativeai as genai
 
-# ... (Your CSS Styling block goes here) ...
-
-# 1. FIRST: Define the functions so Python learns what they are
-DB_FILE = "farm_db.json"
-
-def init_db():
-    if not os.path.exists(DB_FILE):
-        # ... (rest of init_db) ...
-
-def load_db():
-    init_db()
-    with open(DB_FILE, "r") as f:
-        return json.load(f)
-
-def save_db(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data, f)
-
-# 2. SECOND: Now you can safely call the function!
-db = load_db()
-
-# 3. THIRD: The safety patch goes right below that
-if "equipment" not in db:
-    db["equipment"] = [
-        {"id": 1, "type": "Tractor", "name": "Mahindra 575 DI", "available": 3, "rate": 800},
-        {"id": 2, "type": "Tractor", "name": "Swaraj 744 FE", "available": 1, "rate": 750},
-        {"id": 3, "type": "Goods Vehicle", "name": "Tata Ace (Chota Hathi)", "available": 4, "rate": 400},
-        {"id": 4, "type": "Goods Vehicle", "name": "Mahindra Bolero Pickup", "available": 2, "rate": 600}
-    ]
-    save_db(db)
-
-# ... (The rest of your code, starting with lang_dict, continues here) ...
-
-def translate_crop(crop_name):
-    # Dictionary of common crops
-    translations = {
-        "rice": "Rice (அரிசி)",
-        "paddy": "Paddy (நெல்)",
-        "wheat": "Wheat (கோதுமை)",
-        "cotton": "Cotton (பருத்தி)",
-        "sugarcane": "Sugarcane (கரும்பு)",
-        "tomato": "Tomato (தக்காளி)",
-        "onion": "Onion (வெங்காயம்)",
-        "corn": "Corn (மக்காச்சோளம்)",
-        "peanut": "Peanut (நிலக்கடலை)"
-    }
-    # Clean the input and look it up
-    clean_name = crop_name.lower().strip()
-    return translations.get(clean_name, crop_name.title())
-
-
 # --- PAGE CONFIGURATION & GOVERNMENT THEME ---
 st.set_page_config(page_title="Smart Village Farm Network", page_icon="🌾", layout="wide")
 
@@ -79,7 +28,6 @@ st.markdown("""
         border-radius: 8px;
         border: none;
     }
-    /* Force all text inside buttons to be white */
     div.stButton > button * {
         color: #ffffff !important;
     }
@@ -96,7 +44,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- FAIL-PROOF FILE DATABASE ---
+
+# --- 1. DEFINE FUNCTIONS FIRST ---
 DB_FILE = "farm_db.json"
 
 def init_db():
@@ -126,8 +75,35 @@ def save_db(data):
     with open(DB_FILE, "w") as f:
         json.dump(data, f)
 
-# Load the database at the start of every interaction
+def translate_crop(crop_name):
+    translations = {
+        "rice": "Rice (அரிசி)",
+        "paddy": "Paddy (நெல்)",
+        "wheat": "Wheat (கோதுமை)",
+        "cotton": "Cotton (பருத்தி)",
+        "sugarcane": "Sugarcane (கரும்பு)",
+        "tomato": "Tomato (தக்காளி)",
+        "onion": "Onion (வெங்காயம்)",
+        "corn": "Corn (மக்காச்சோளம்)",
+        "peanut": "Peanut (நிலக்கடலை)"
+    }
+    clean_name = crop_name.lower().strip()
+    return translations.get(clean_name, crop_name.title())
+
+
+# --- 2. LOAD DATABASE & APPLY SAFETY PATCH ---
 db = load_db()
+
+if "equipment" not in db:
+    db["equipment"] = [
+        {"id": 1, "type": "Tractor", "name": "Mahindra 575 DI", "available": 3, "rate": 800},
+        {"id": 2, "type": "Tractor", "name": "Swaraj 744 FE", "available": 1, "rate": 750},
+        {"id": 3, "type": "Goods Vehicle", "name": "Tata Ace (Chota Hathi)", "available": 4, "rate": 400},
+        {"id": 4, "type": "Goods Vehicle", "name": "Mahindra Bolero Pickup", "available": 2, "rate": 600}
+    ]
+    save_db(db)
+
+# ... (Continue with your lang_dict and the rest of the app here!) ...
 
 # --- BILINGUAL DICTIONARY (English / Tamil) ---
 lang_dict = {
