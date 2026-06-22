@@ -114,6 +114,7 @@ lang_dict = {
         "role": "Role",
         "farmer": "Farmer",
         "consumer": "Consumer",
+        "transporter": "Transporter",
         "dashboard": "Village Dashboard",
         "marketplace": "Marketplace",
         "sowing": "My Sowing Details",
@@ -130,6 +131,7 @@ lang_dict = {
         "role": "பங்கு",
         "farmer": "விவசாயி",
         "consumer": "நுகர்வோர்",
+        "transporter": "போக்குவரத்துாளர்",
         "dashboard": "கிராம டாஷ்போர்டு",
         "marketplace": "சந்தை",
         "sowing": "விதைப்பு விவரங்கள்",
@@ -164,20 +166,24 @@ if st.session_state.current_email is None:
                 email = st.text_input(t["email"])
                 name = st.text_input("Full Name / முழு பெயர்")
                 phone = st.text_input("Mobile Number / அலைபேசி எண்")
-                role = st.selectbox(t["role"], [t["farmer"], t["consumer"]])
+                role = st.selectbox(t["role"], [t["farmer"], t["consumer"], t["transporter"]]) # Added 3rd role
                 
                 if st.form_submit_button(t["login"], use_container_width=True):
                     if email and name:
                         if email not in db["users"]:
-                            # --- NEW: Check for Unique Name ---
                             name_exists = any(u["name"].lower() == name.lower() for u in db["users"].values())
                             if name_exists:
-                                st.error("⚠️ This Name is already registered! Please use a unique name (e.g., 'Ravi - North').")
+                                st.error("⚠️ This Name is already registered! Please use a unique name.")
                             else:
+                                # Determine exact role to save
+                                if role in ["Farmer", "விவசாயி"]: final_role = "Farmer"
+                                elif role in ["Consumer", "நுகர்வோர்"]: final_role = "Consumer"
+                                else: final_role = "Transporter"
+                                
                                 db["users"][email] = {
                                     "name": name, 
                                     "phone": phone, 
-                                    "role": "Farmer" if role in ["Farmer", "விவசாயி"] else "Consumer"
+                                    "role": final_role
                                 }
                                 save_db(db)
                                 st.session_state.current_email = email
@@ -575,6 +581,61 @@ else:
                             
                     except Exception as e:
                         st.error(f"Secure Connection Failed or API Error: {e}")
+
+    # ================= TRANSPORTER VIEW =================
+    elif user_info["role"] == "Transporter":
+        st.header("🚚 Transport Dashboard / போக்குவரத்து டாஷ்போர்டு")
+        
+        tab1, tab2 = st.tabs(["📝 Register Vehicle", "📦 My Trip Bookings"])
+        
+        # TAB 1: Add Vehicle
+        with tab1:
+            with st.container(border=True):
+                st.subheader("List Your Goods Vehicle")
+                with st.form("add_vehicle"):
+                    v_name = st.text_input("Vehicle Model (e.g., Tata Ace, Bolero)")
+                    v_no = st.text_input("Vehicle Registration No. (e.g., TN-38-AB-1234)")
+                    v_cap = st.number_input("Max Load Capacity (KG)", min_value=100, step=100)
+                    v_rate = st.number_input("Rate Per Trip/Km (₹)", min_value=50, step=50)
+                    
+                    if st.form_submit_button("Publish Vehicle"):
+                        if v_name and v_no:
+                            db["transporters"].append({
+                                "id": f"TRK-{random.randint(100,999)}",
+                                "owner_email": st.session_state.current_email,
+                                "owner_name": user_info['name'],
+                                "owner_phone": user_info['phone'],
+                                "vehicle_name": v_name,
+                                "vehicle_no": v_no,
+                                "capacity": int(v_cap),
+                                "rate": int(v_rate),
+                                "status": "Available"
+                            })
+                            save_db(db)
+                            st.success("Vehicle Listed Successfully!")
+                            st.rerun()
+                            
+            # Show their current listings
+            st.write("**Your Listed Vehicles:**")
+            my_trucks = [t for t in db["transporters"] if t["owner_email"] == st.session_state.current_email]
+            st.table(my_trucks)
+
+        # TAB 2: See who booked them
+        with tab2:
+            st.subheader("Active Trip Requests")
+            if st.button("🔄 Refresh Trips"): st.rerun()
+            
+            my_trips = [b for b in db["transport_bookings"] if b["transporter_email"] == st.session_state.current_email]
+            if not my_trips:
+                st.info("No trip bookings yet.")
+            for trip in my_trips:
+                with st.container(border=True):
+                    st.success(f"📦 **Trip Booked by:** {trip['booker_name']} ({trip['booker_role']})")
+                    st.write(f"📞 **Contact:** {trip['booker_phone']}")
+                    st.write(f"🚜 **Vehicle Assigned:** {trip['vehicle_name']} [{trip['vehicle_no']}]")
+                    st.caption(f"Booked on: {trip['timestamp']}")
+
+    
 # ================= UNIVERSAL MACHINERY & TRANSPORT POOL (SIDEBAR) =================
     st.sidebar.divider()
     with st.sidebar.expander("🚜 Machinery & Transport Pool"):
