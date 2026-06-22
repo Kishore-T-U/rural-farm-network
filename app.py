@@ -592,11 +592,11 @@ else:
         
         tab1, tab2 = st.tabs(["📝 Register Vehicle", "📦 My Trip Bookings"])
         
-        # TAB 1: Add Vehicle
+       # TAB 1: Add Vehicle
         with tab1:
             with st.container(border=True):
                 st.subheader("List Your Goods Vehicle")
-                with st.form("add_vehicle"):
+                with st.form("add_vehicle", clear_on_submit=True):
                     v_name = st.text_input("Vehicle Model (e.g., Tata Ace, Bolero)")
                     v_no = st.text_input("Vehicle Registration No. (e.g., TN-38-AB-1234)")
                     v_cap = st.number_input("Max Load Capacity (KG)", min_value=100, step=100)
@@ -604,20 +604,58 @@ else:
                     
                     if st.form_submit_button("Publish Vehicle"):
                         if v_name and v_no:
-                            db["transporters"].append({
-                                "id": f"TRK-{random.randint(100,999)}",
-                                "owner_email": st.session_state.current_email,
-                                "owner_name": user_info['name'],
-                                "owner_phone": user_info['phone'],
-                                "vehicle_name": v_name,
-                                "vehicle_no": v_no,
-                                "capacity": int(v_cap),
-                                "rate": int(v_rate),
-                                "status": "Available"
-                            })
-                            save_db(db)
-                            st.success("Vehicle Listed Successfully!")
-                            st.rerun()
+                            # --- FIX 1: Prevent Duplicate Vehicle Registrations ---
+                            if any(t['vehicle_no'].replace(" ", "").lower() == v_no.replace(" ", "").lower() for t in db["transporters"]):
+                                st.error("⚠️ This Vehicle Registration No. is already listed!")
+                            else:
+                                db["transporters"].append({
+                                    "id": f"TRK-{random.randint(100,999)}",
+                                    "owner_email": st.session_state.current_email,
+                                    "owner_name": user_info['name'],
+                                    "owner_phone": user_info['phone'],
+                                    "vehicle_name": v_name,
+                                    "vehicle_no": v_no,
+                                    "capacity": int(v_cap),
+                                    "rate": int(v_rate),
+                                    "status": "Available"
+                                })
+                                save_db(db)
+                                st.success("Vehicle Listed Successfully!")
+                                st.rerun()
+                            
+            # --- FIX 2: Interactive Vehicle Manager (Toggle Status) ---
+            st.write("**Your Listed Vehicles / உங்கள் வாகனங்கள்:**")
+            my_trucks = [t for t in db["transporters"] if t["owner_email"] == st.session_state.current_email]
+            
+            if not my_trucks:
+                st.info("No vehicles listed yet.")
+            else:
+                for truck in my_trucks:
+                    with st.container(border=True):
+                        colA, colB = st.columns([2, 1])
+                        with colA:
+                            st.write(f"🚛 **{truck['vehicle_name']}** ({truck['vehicle_no']})")
+                            st.write(f"Capacity: {truck['capacity']} KG | Rate: ₹{truck['rate']}")
+                        
+                        with colB:
+                            if truck["status"] == "Available":
+                                st.success("🟢 Available")
+                                if st.button("Mark Unavailable", key=f"tog_unavail_{truck['id']}"):
+                                    for t_idx, db_t in enumerate(db["transporters"]):
+                                        if db_t["id"] == truck["id"]:
+                                            db["transporters"][t_idx]["status"] = "Unavailable"
+                                            break
+                                    save_db(db)
+                                    st.rerun()
+                            else:
+                                st.error("🔴 Unavailable (Booked)")
+                                if st.button("Mark Available", key=f"tog_avail_{truck['id']}"):
+                                    for t_idx, db_t in enumerate(db["transporters"]):
+                                        if db_t["id"] == truck["id"]:
+                                            db["transporters"][t_idx]["status"] = "Available"
+                                            break
+                                    save_db(db)
+                                    st.rerun()
                             
             # Show their current listings
             st.write("**Your Listed Vehicles:**")
@@ -689,6 +727,12 @@ else:
                     st.write(f"Driver: {truck['owner_name']} | Rate: ₹{truck['rate']}")
                     
                     if st.button(f"Book Truck (₹{truck['rate']})", key=f"book_trk_{truck['id']}"):
+                        # --- FIX 3: Change Status to Unavailable Immediately ---
+                        for t_idx, db_t in enumerate(db["transporters"]):
+                            if db_t["id"] == truck["id"]:
+                                db["transporters"][t_idx]["status"] = "Unavailable"
+                                break
+                                
                         # Log the booking
                         db["transport_bookings"].append({
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -701,6 +745,10 @@ else:
                             "booker_role": user_info['role']
                         })
                         save_db(db)
+                        
+                        # Set a temporary session state variable to show the success message
+                        st.session_state.booking_success = f"✅ Booked! Driver Phone: {truck['owner_phone']}"
+                        st.rerun()
                         
                         # Generate instant receipt/alert for the booker
                         st.sidebar.success("✅ Driver Notified! Contact Details below:")
