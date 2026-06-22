@@ -121,16 +121,45 @@ else:
                         "id": random.randint(1000, 9999),
                         "consumer_email": st.session_state.current_email,
                         "consumer_name": user_info['name'],
-                        "crop": crop, "qty": qty, "price": price, "status": "Open"
+                        "crop": crop, "qty": qty, "price": price, "status": "Open",
+                        "farmer_email": None, "farmer_name": None # placeholders for negotiation
                     })
                     st.success("Demand Broadcasted to Farmers!")
                     st.rerun()
                     
         with col2:
-            st.subheader("Your Agreements / உங்கள் ஒப்பந்தங்கள்")
+            st.subheader("Live Negotiations & Agreements")
+            
+            # Show Pending / Negotiating Demands
+            my_open_demands = [d for d in db["demands"] if d["consumer_email"] == st.session_state.current_email and d["status"] != "Closed"]
+            
+            if my_open_demands:
+                st.write("**Pending Requests:**")
+                for d in my_open_demands:
+                    with st.container(border=True):
+                        if d["status"] == "Open":
+                            st.info(f"⏳ Waiting for farmers: **{d['crop']}** ({d['qty']} KG) at ₹{d['price']}")
+                        elif d["status"] == "Countered":
+                            st.warning(f"🔄 **Counter-Offer Received!** Farmer {d['farmer_name']} offers ₹{d['price']} for your {d['qty']} KG of {d['crop']}.")
+                            if st.button("Accept Farmer's Price", key=f"acc_counter_{d['id']}"):
+                                d["status"] = "Closed"
+                                db["agreements"].append({
+                                    "consumer_email": d['consumer_email'],
+                                    "consumer_name": d['consumer_name'],
+                                    "farmer_email": d['farmer_email'],
+                                    "farmer_name": d['farmer_name'],
+                                    "crop": d['crop'], "qty": d['qty'], "price": d['price']
+                                })
+                                st.rerun()
+
+            st.divider()
+            # Show Final Agreements
+            st.write(f"**{t.get('Your Agreements', 'Your Agreements / உங்கள் ஒப்பந்தங்கள்')}:**")
             my_agreements = [a for a in db["agreements"] if a["consumer_email"] == st.session_state.current_email]
+            if not my_agreements:
+                st.write("No finalized agreements yet.")
             for a in my_agreements:
-                st.info(f"**{a['crop']}** ({a['qty']} KG) at ₹{a['price']} - Accepted by Farmer: {a['farmer_name']} (Ph: {a['farmer_phone']})")
+                st.success(f"✅ **{a['crop']}** ({a['qty']} KG) locked at ₹{a['price']} with Farmer: {a['farmer_name']}")
 
     # --- FARMER VIEW ---
     elif user_info["role"] == "Farmer":
@@ -187,7 +216,7 @@ else:
                     except Exception as e:
                         st.error(f"AI Model Error: {e}")
 
-        # TAB 3: Marketplace (Accepting Demands)
+        # TAB 3: Marketplace (Accepting & Negotiating Demands)
         with tabs[2]:
             st.header("Live Consumer Demands / நேரடி நுகர்வோர் தேவைகள்")
             open_demands = [d for d in db["demands"] if d["status"] == "Open"]
@@ -198,16 +227,30 @@ else:
             for d in open_demands:
                 with st.container(border=True):
                     st.write(f"### {d['crop']} ({d['qty']} KG)")
-                    st.write(f"**Price:** ₹{d['price']} | **Consumer:** {d['consumer_name']}")
-                    if st.button("Accept Agreement / ஒப்பந்தத்தை ஏற்கவும்", key=d['id']):
-                        d["status"] = "Closed"
-                        db["agreements"].append({
-                            "consumer_email": d['consumer_email'],
-                            "consumer_name": d['consumer_name'],
-                            "farmer_email": st.session_state.current_email,
-                            "farmer_name": user_info['name'],
-                            "farmer_phone": user_info['phone'],
-                            "crop": d['crop'], "qty": d['qty'], "price": d['price']
-                        })
-                        st.success("Agreement generated! Your contact info has been shared with the consumer.")
-                        st.rerun()
+                    st.write(f"**Consumer Offered Price:** ₹{d['price']} | **Buyer:** {d['consumer_name']}")
+                    
+                    colA, colB = st.columns(2)
+                    with colA:
+                        # Direct Accept
+                        if st.button("Accept Deal / ஏற்கவும்", key=f"acc_farm_{d['id']}"):
+                            d["status"] = "Closed"
+                            db["agreements"].append({
+                                "consumer_email": d['consumer_email'],
+                                "consumer_name": d['consumer_name'],
+                                "farmer_email": st.session_state.current_email,
+                                "farmer_name": user_info['name'],
+                                "crop": d['crop'], "qty": d['qty'], "price": d['price']
+                            })
+                            st.success("Agreement generated!")
+                            st.rerun()
+                    
+                    with colB:
+                        # Counter Offer Logic
+                        counter_price = st.number_input("Suggest New Price (₹)", min_value=1, value=d['price'], key=f"inp_{d['id']}")
+                        if st.button("Send Counter Offer", key=f"cnt_{d['id']}"):
+                            d["status"] = "Countered"
+                            d["price"] = counter_price # Update the price to the farmer's new offer
+                            d["farmer_email"] = st.session_state.current_email
+                            d["farmer_name"] = user_info['name']
+                            st.info("Counter offer sent to consumer!")
+                            st.rerun()
