@@ -292,9 +292,18 @@ else:
             st.table(db["sowing_data"])
 
         # TAB 3: AI Prediction & State Analytics
+        # TAB 3: AI Prediction & State Analytics
         with tabs[2]:
             st.header(t["ai_predict"] + " (State-Level Integration)")
             st.write("Analyze localized sowing patterns strictly mapped to LGD codes and current climatic conditions to prevent market saturation.")
+            
+            # --- API KEY UPDATE: Automatically pull from Streamlit Secrets ---
+            try:
+                api_key = st.secrets["GEMINI_API_KEY"]
+                st.success("Secure Government AI Link Established.")
+            except:
+                api_key = None
+                st.error("API Key missing from Server Secrets.")
             
             # 1. Secure API Key Input
             api_key = st.text_input("Enter Gemini API Key (Hidden Securely) / AI குறியீட்டை உள்ளிடவும்", type="password")
