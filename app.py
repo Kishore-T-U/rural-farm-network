@@ -5,6 +5,24 @@ import json
 import os
 import google.generativeai as genai
 
+def translate_crop(crop_name):
+    # Dictionary of common crops
+    translations = {
+        "rice": "Rice (அரிசி)",
+        "paddy": "Paddy (நெல்)",
+        "wheat": "Wheat (கோதுமை)",
+        "cotton": "Cotton (பருத்தி)",
+        "sugarcane": "Sugarcane (கரும்பு)",
+        "tomato": "Tomato (தக்காளி)",
+        "onion": "Onion (வெங்காயம்)",
+        "corn": "Corn (மக்காச்சோளம்)",
+        "peanut": "Peanut (நிலக்கடலை)"
+    }
+    # Clean the input and look it up
+    clean_name = crop_name.lower().strip()
+    return translations.get(clean_name, crop_name.title())
+
+
 # --- PAGE CONFIGURATION & GOVERNMENT THEME ---
 st.set_page_config(page_title="Smart Village Farm Network", page_icon="🌾", layout="wide")
 
@@ -169,20 +187,31 @@ else:
         with col1:
             with st.container(border=True):
                 st.subheader(t["post_demand"])
-                with st.form("demand_form"):
-                    crop = st.text_input(t["crop_name"])
-                    qty = st.number_input(t["qty"] + " (KG)", min_value=1)
-                    price = st.number_input("Offered Price / வழங்கப்படும் விலை (₹)", min_value=1)
+                with st.form("demand_form", clear_on_submit=True): # Clears box after typing
+                    crop = st.text_input(t["crop_name"], placeholder="e.g., Rice")
+                    qty = st.number_input(t["qty"] + " (KG)", min_value=1, step=1)
+                    
+                    # FIX: Force integer, add a default value of 1000, and step by 100
+                    price = st.number_input("Offered Price / வழங்கப்படும் விலை (₹)", min_value=1, value=1000, step=100, format="%d")
+                    
                     if st.form_submit_button("Submit Request"):
-                        db["demands"].append({
-                            "id": random.randint(1000, 9999),
-                            "consumer_email": st.session_state.current_email,
-                            "consumer_name": user_info['name'],
-                            "crop": crop, "qty": qty, "price": price, "status": "Open",
-                            "farmer_email": "", "farmer_name": ""
-                        })
-                        save_db(db)
-                        st.rerun()
+                        if crop: # Ensure they didn't leave it blank
+                            final_crop_name = translate_crop(crop) # Auto-Translate
+                            db["demands"].append({
+                                "id": random.randint(1000, 9999),
+                                "consumer_email": st.session_state.current_email,
+                                "consumer_name": user_info['name'],
+                                "crop": final_crop_name, 
+                                "qty": int(qty), 
+                                "price": int(price), # Force exactly what they typed
+                                "status": "Open",
+                                "farmer_email": "", "farmer_name": ""
+                            })
+                            save_db(db)
+                            st.success("Demand successfully sent to farmers!")
+                            st.rerun()
+                        else:
+                            st.error("Please enter a crop name.")
                     
         with col2:
             st.subheader("Live Negotiations & Agreements")
@@ -224,16 +253,23 @@ else:
                 st.success(f"✅ **{a['crop']}** ({a['qty']} KG) locked at ₹{a['price']} with Farmer: {a['farmer_name']}")
 
     # ================= FARMER VIEW =================
+    # ================= FARMER VIEW =================
     elif user_info["role"] == "Farmer":
         tabs = st.tabs([f"🛒 {t['marketplace']}", f"🌱 {t['sowing']}", f"🤖 {t['ai_predict']}"])
         
         # TAB 1: Marketplace
         with tabs[0]:
             st.header("Live Consumer Demands / நேரடி நுகர்வோர் தேவைகள்")
+            
+            # THE FIX: A button to safely fetch new data from the database
+            if st.button("🔄 Check for New Demands"):
+                db = load_db() # Force reload the JSON file
+                st.rerun()
+                
             open_demands = [d for d in db["demands"] if d["status"] == "Open"]
             
             if not open_demands:
-                st.write("No active demands right now.")
+                st.info("No active demands right now. Click 'Check for New Demands' to refresh.")
                 
             for d in open_demands:
                 with st.container(border=True):
