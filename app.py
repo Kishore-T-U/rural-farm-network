@@ -1,15 +1,32 @@
 import streamlit as st
 import random
-from datetime import date
+from datetime import datetime
 import json
 import os
 import google.generativeai as genai
-from datetime import datetime
 
-# Load the database at the start of every interaction
+# ... (Your CSS Styling block goes here) ...
+
+# 1. FIRST: Define the functions so Python learns what they are
+DB_FILE = "farm_db.json"
+
+def init_db():
+    if not os.path.exists(DB_FILE):
+        # ... (rest of init_db) ...
+
+def load_db():
+    init_db()
+    with open(DB_FILE, "r") as f:
+        return json.load(f)
+
+def save_db(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data, f)
+
+# 2. SECOND: Now you can safely call the function!
 db = load_db()
 
-# --- NEW: SAFETY PATCH TO AUTO-UPDATE OLD DATABASES ---
+# 3. THIRD: The safety patch goes right below that
 if "equipment" not in db:
     db["equipment"] = [
         {"id": 1, "type": "Tractor", "name": "Mahindra 575 DI", "available": 3, "rate": 800},
@@ -18,6 +35,8 @@ if "equipment" not in db:
         {"id": 4, "type": "Goods Vehicle", "name": "Mahindra Bolero Pickup", "available": 2, "rate": 600}
     ]
     save_db(db)
+
+# ... (The rest of your code, starting with lang_dict, continues here) ...
 
 def translate_crop(crop_name):
     # Dictionary of common crops
