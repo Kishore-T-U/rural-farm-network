@@ -4,6 +4,7 @@ from datetime import date
 import json
 import os
 import google.generativeai as genai
+from datetime import datetime
 
 def translate_crop(crop_name):
     # Dictionary of common crops
@@ -41,13 +42,17 @@ st.markdown("""
 
     /* Style the buttons */
     div.stButton > button {
-        background-color: #2e7d32; /* Solid Green */
-        color: white !important;
+        background-color: #2e7d32 !important; /* Solid Green */
+        color: #ffffff !important;
         border-radius: 8px;
         border: none;
     }
+    /* Force all text inside buttons to be white */
+    div.stButton > button * {
+        color: #ffffff !important;
+    }
     div.stButton > button:hover {
-        background-color: #1b5e20;
+        background-color: #1b5e20 !important;
     }
 
     /* Make input boxes clean */
@@ -69,9 +74,9 @@ def init_db():
             "demands": [],
             "agreements": [],
             "sowing_data": [],
+            "reviews": {}, # NEW: Stores farmer reviews
             "tractors": [
-                {"id": 1, "name": "Mahindra 575 DI", "available": 3, "rate": 800},
-                {"id": 2, "name": "Swaraj 744 FE", "available": 1, "rate": 750}
+                {"id": 1, "name": "Mahindra 575 DI", "available": 3, "rate": 800}
             ]
         }
         with open(DB_FILE, "w") as f:
@@ -183,75 +188,88 @@ else:
     if user_info["role"] == "Consumer":
         st.header(f"🛒 {t['marketplace']} (Consumer View)")
         
+        # --- NEW: Consumer Refresh Button ---
+        if st.button("🔄 Check for Updates / புதுப்பிக்கவும்"):
+            db = load_db()
+            st.rerun()
+            
         col1, col2 = st.columns([1, 2])
         with col1:
             with st.container(border=True):
                 st.subheader(t["post_demand"])
-                with st.form("demand_form", clear_on_submit=True): # Clears box after typing
-                    crop = st.text_input(t["crop_name"], placeholder="e.g., Rice")
+                with st.form("demand_form", clear_on_submit=True):
+                    crop = st.text_input(t["crop_name"])
                     qty = st.number_input(t["qty"] + " (KG)", min_value=1, step=1)
-                    
-                    # FIX: Force integer, add a default value of 1000, and step by 100
-                    price = st.number_input("Offered Price / வழங்கப்படும் விலை (₹)", min_value=1, value=1000, step=100, format="%d")
-                    
+                    price = st.number_input("Offered Price / வழங்கப்படும் விலை (₹)", min_value=1, value=1000, step=100)
                     if st.form_submit_button("Submit Request"):
-                        if crop: # Ensure they didn't leave it blank
-                            final_crop_name = translate_crop(crop) # Auto-Translate
+                        if crop:
                             db["demands"].append({
                                 "id": random.randint(1000, 9999),
                                 "consumer_email": st.session_state.current_email,
                                 "consumer_name": user_info['name'],
-                                "crop": final_crop_name, 
-                                "qty": int(qty), 
-                                "price": int(price), # Force exactly what they typed
-                                "status": "Open",
+                                "crop": crop, "qty": int(qty), "price": int(price), "status": "Open",
                                 "farmer_email": "", "farmer_name": ""
                             })
                             save_db(db)
-                            st.success("Demand successfully sent to farmers!")
+                            st.success("Demand Broadcasted!")
                             st.rerun()
-                        else:
-                            st.error("Please enter a crop name.")
                     
         with col2:
             st.subheader("Live Negotiations & Agreements")
             
-            # Pending / Negotiating Demands
             my_open_demands = [d for d in db["demands"] if d["consumer_email"] == st.session_state.current_email and d["status"] != "Closed"]
             if my_open_demands:
-                st.write("**Pending Requests:**")
-                for idx, d in enumerate(my_open_demands):
+                for d in my_open_demands:
                     with st.container(border=True):
                         if d["status"] == "Open":
                             st.info(f"⏳ Waiting for farmers: **{d['crop']}** ({d['qty']} KG) at ₹{d['price']}")
                         elif d["status"] == "Countered":
-                            st.warning(f"🔄 **Counter-Offer!** Farmer {d['farmer_name']} offers ₹{d['price']} for {d['qty']} KG of {d['crop']}.")
-                            if st.button("Accept Farmer's Price", key=f"acc_cnt_{d['id']}"):
-                                # Find the demand in the main db and update it
+                            # --- NEW: Show Farmer Rating on Counter Offer ---
+                            farmer_reviews = db.get("reviews", {}).get(d['farmer_email'], [])
+                            rating_text = f"⭐ {sum(r['rating'] for r in farmer_reviews)/len(farmer_reviews):.1f} ({len(farmer_reviews)} Reviews)" if farmer_reviews else "No reviews yet"
+                            
+                            st.warning(f"🔄 **Counter-Offer!** Farmer {d['farmer_name']} [{rating_text}] offers ₹{d['price']} for {d['qty']} KG.")
+                            if st.button("Accept Farmer's Price", key=f"acc_{d['id']}"):
                                 for m_idx, main_d in enumerate(db["demands"]):
                                     if main_d["id"] == d["id"]:
                                         db["demands"][m_idx]["status"] = "Closed"
                                         break
+                                
+                                # Fetch full contact details for both
+                                f_info = db["users"][d['farmer_email']]
                                 db["agreements"].append({
-                                    "consumer_email": d['consumer_email'],
-                                    "consumer_name": d['consumer_name'],
-                                    "farmer_email": d['farmer_email'],
-                                    "farmer_name": d['farmer_name'],
+                                    "id": f"AGR-{random.randint(10000, 99999)}",
+                                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    "consumer_email": d['consumer_email'], "consumer_name": d['consumer_name'], "consumer_phone": user_info['phone'],
+                                    "farmer_email": d['farmer_email'], "farmer_name": d['farmer_name'], "farmer_phone": f_info['phone'],
                                     "crop": d['crop'], "qty": d['qty'], "price": d['price']
                                 })
                                 save_db(db)
                                 st.rerun()
 
             st.divider()
-            
-            # Final Agreements
             st.write("**Your Final Agreements / உங்கள் ஒப்பந்தங்கள்:**")
             my_agreements = [a for a in db["agreements"] if a["consumer_email"] == st.session_state.current_email]
-            if not my_agreements:
-                st.write("No finalized agreements yet.")
+            
             for a in my_agreements:
-                st.success(f"✅ **{a['crop']}** ({a['qty']} KG) locked at ₹{a['price']} with Farmer: {a['farmer_name']}")
-
+                with st.container(border=True):
+                    st.success(f"✅ **{a['crop']}** ({a['qty']} KG) at ₹{a['price']} | Time: {a['timestamp']}")
+                    st.write(f"📞 **Farmer Contact:** {a['farmer_name']} | Ph: {a['farmer_phone']} | Email: {a['farmer_email']}")
+                    
+                    # --- NEW: Downloadable Receipt ---
+                    receipt_text = f"GOVT RURAL PRODUCTION RECEIPT\nID: {a['id']}\nDate: {a['timestamp']}\nCrop: {a['crop']} ({a['qty']} KG)\nPrice: Rs.{a['price']}\n\nFARMER: {a['farmer_name']} ({a['farmer_phone']})\nCONSUMER: {a['consumer_name']} ({a['consumer_phone']})"
+                    st.download_button("📥 Download Official Receipt", data=receipt_text, file_name=f"Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_{a['id']}")
+                    
+                    # --- NEW: Review System ---
+                    with st.expander(f"Rate & Review Farmer: {a['farmer_name']}"):
+                        rating = st.slider("Rating (Stars)", 1, 5, 5, key=f"rate_{a['id']}")
+                        comment = st.text_input("Write a review / விமர்சனம்", key=f"rev_{a['id']}")
+                        if st.button("Submit Review", key=f"subrev_{a['id']}"):
+                            if "reviews" not in db: db["reviews"] = {}
+                            if a['farmer_email'] not in db["reviews"]: db["reviews"][a['farmer_email']] = []
+                            db["reviews"][a['farmer_email']].append({"rating": rating, "comment": comment, "by": user_info['name']})
+                            save_db(db)
+                            st.success("Review saved! / விமர்சனம் சேமிக்கப்பட்டது!")
     # ================= FARMER VIEW =================
     # ================= FARMER VIEW =================
     elif user_info["role"] == "Farmer":
@@ -283,15 +301,21 @@ else:
                                 if main_d["id"] == d["id"]:
                                     db["demands"][idx]["status"] = "Closed"
                                     break
+                                    
+                            # Fetch full contact details of the consumer
+                            c_info = db["users"][d['consumer_email']]
+                            
                             db["agreements"].append({
-                                "consumer_email": d['consumer_email'],
-                                "consumer_name": d['consumer_name'],
-                                "farmer_email": st.session_state.current_email,
-                                "farmer_name": user_info['name'],
+                                "id": f"AGR-{random.randint(10000, 99999)}",
+                                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "consumer_email": d['consumer_email'], "consumer_name": d['consumer_name'], "consumer_phone": c_info['phone'],
+                                "farmer_email": st.session_state.current_email, "farmer_name": user_info['name'], "farmer_phone": user_info['phone'],
                                 "crop": d['crop'], "qty": d['qty'], "price": d['price']
                             })
                             save_db(db)
+                            st.success("Deal Accepted! Check below for details.")
                             st.rerun()
+
                     
                     with colB:
                         counter_price = st.number_input("Suggest New Price (₹)", min_value=1, value=d['price'], key=f"inp_{d['id']}")
