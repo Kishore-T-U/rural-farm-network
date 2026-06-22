@@ -105,6 +105,10 @@ if "equipment" not in db:
 
 # ... (Continue with your lang_dict and the rest of the app here!) ...
 
+
+if "transporters" not in db: db["transporters"] = []
+if "transport_bookings" not in db: db["transport_bookings"] = []
+
 # --- BILINGUAL DICTIONARY (English / Tamil) ---
 lang_dict = {
     "English": {
@@ -666,4 +670,39 @@ else:
                     st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=panchayat@bank&pn=TransportPool&am={item['rate']}", width=150)
             else:
                 st.button("Currently Unavailable", key=f"book_eq_{item['id']}", disabled=True)
+
+# ================= HIRE PRIVATE TRANSPORTER (SIDEBAR) =================
+    # Only show this to Farmers and Consumers (Transporters don't need to book themselves)
+    if user_info["role"] in ["Farmer", "Consumer"]:
+        st.sidebar.divider()
+        with st.sidebar.expander("🚚 Hire Local Transporter"):
+            st.write("Directly book private logistics for your goods.")
+            
+            available_trucks = [t for t in db.get("transporters", []) if t["status"] == "Available"]
+            
+            if not available_trucks:
+                st.caption("No private transporters available in your area right now.")
+            else:
+                for truck in available_trucks:
+                    st.info(f"**{truck['vehicle_name']}**")
+                    st.caption(f"Reg No: {truck['vehicle_no']} | Capacity: {truck['capacity']} KG")
+                    st.write(f"Driver: {truck['owner_name']} | Rate: ₹{truck['rate']}")
+                    
+                    if st.button(f"Book Truck (₹{truck['rate']})", key=f"book_trk_{truck['id']}"):
+                        # Log the booking
+                        db["transport_bookings"].append({
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "transporter_email": truck['owner_email'],
+                            "vehicle_name": truck['vehicle_name'],
+                            "vehicle_no": truck['vehicle_no'],
+                            "booker_email": st.session_state.current_email,
+                            "booker_name": user_info['name'],
+                            "booker_phone": user_info['phone'],
+                            "booker_role": user_info['role']
+                        })
+                        save_db(db)
+                        
+                        # Generate instant receipt/alert for the booker
+                        st.sidebar.success("✅ Driver Notified! Contact Details below:")
+                        st.sidebar.write(f"📞 **Driver Phone:** {truck['owner_phone']}")
 
