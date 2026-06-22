@@ -74,9 +74,12 @@ def init_db():
             "demands": [],
             "agreements": [],
             "sowing_data": [],
-            "reviews": {}, # NEW: Stores farmer reviews
-            "tractors": [
-                {"id": 1, "name": "Mahindra 575 DI", "available": 3, "rate": 800}
+            "reviews": {},
+            "equipment": [
+                {"id": 1, "type": "Tractor", "name": "Mahindra 575 DI", "available": 3, "rate": 800},
+                {"id": 2, "type": "Tractor", "name": "Swaraj 744 FE", "available": 1, "rate": 750},
+                {"id": 3, "type": "Goods Vehicle", "name": "Tata Ace (Chota Hathi)", "available": 4, "rate": 400},
+                {"id": 4, "type": "Goods Vehicle", "name": "Mahindra Bolero Pickup", "available": 2, "rate": 600}
             ]
         }
         with open(DB_FILE, "w") as f:
@@ -394,6 +397,24 @@ else:
                             save_db(db)
                             st.rerun()
 
+        # --- NEW: Farmer's Final Agreements & Receipts Ledger ---
+            st.divider()
+            st.write("### Your Final Agreements & Sales / உங்கள் ஒப்பந்தங்கள்")
+            
+            my_sales = [a for a in db["agreements"] if a["farmer_email"] == st.session_state.current_email]
+            
+            if not my_sales:
+                st.write("No finalized sales yet.")
+            else:
+                for a in my_sales:
+                    with st.container(border=True):
+                        st.success(f"✅ **{a['crop']}** ({a['qty']} KG) sold for ₹{a['price']} | Time: {a['timestamp']}")
+                        st.write(f"📞 **Consumer Contact:** {a['consumer_name']} | Ph: {a['consumer_phone']} | Email: {a['consumer_email']}")
+                        
+                        # Generate the identical downloadable receipt for the farmer
+                        receipt_text = f"GOVT RURAL PRODUCTION RECEIPT\nID: {a['id']}\nDate: {a['timestamp']}\nCrop: {a['crop']} ({a['qty']} KG)\nPrice: Rs.{a['price']}\n\nFARMER: {a['farmer_name']} ({a['farmer_phone']})\nCONSUMER: {a['consumer_name']} ({a['consumer_phone']})"
+                        st.download_button("📥 Download Official Receipt", data=receipt_text, file_name=f"Sale_Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_farm_{a['id']}")
+
         # TAB 2: Sowing Input
         with tabs[1]:
             st.header(t["sowing"])
@@ -428,9 +449,6 @@ else:
             except:
                 api_key = None
                 st.error("API Key missing from Server Secrets.")
-            
-            # 1. Secure API Key Input
-            api_key = st.text_input("Enter Gemini API Key (Hidden Securely) / AI குறியீட்டை உள்ளிடவும்", type="password")
             
             # 2. Local Government Directory (LGD) Integration for Tamil Nadu
             # In a production app, this would be an API call to the national LGD database
@@ -497,3 +515,35 @@ else:
                             
                     except Exception as e:
                         st.error(f"Secure Connection Failed or API Error: {e}")
+
+# ================= UNIVERSAL MACHINERY & TRANSPORT POOL (SIDEBAR) =================
+    st.sidebar.divider()
+    with st.sidebar.expander("🚜 Machinery & Transport Pool"):
+        st.write("Rent shared agricultural equipment and goods vehicles via local panchayat nodes.")
+        
+        # Loop through the new equipment list
+        for item in db.get("equipment", []):
+            is_avail = item["available"] > 0
+            
+            # Display an icon based on the type
+            icon = "🚜" if item["type"] == "Tractor" else "🚚"
+            
+            st.info(f"**{icon} {item['name']}**")
+            st.caption(f"Type: {item['type']}")
+            st.write(f"Available: {item['available']} Unit(s)")
+            st.write(f"Rate: ₹{item['rate']} / hr")
+            
+            if is_avail:
+                if st.button(f"Book {item['type']} (₹{item['rate']})", key=f"book_eq_{item['id']}"):
+                    # Deduct availability
+                    for idx, db_item in enumerate(db["equipment"]):
+                        if db_item["id"] == item["id"]:
+                            db["equipment"][idx]["available"] -= 1
+                            break
+                    save_db(db)
+                    
+                    st.success(f"{item['type']} Reserved! Scan below to complete Panchayat booking:")
+                    st.image(f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=panchayat@bank&pn=TransportPool&am={item['rate']}", width=150)
+            else:
+                st.button("Currently Unavailable", key=f"book_eq_{item['id']}", disabled=True)
+
