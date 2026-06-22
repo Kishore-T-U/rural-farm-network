@@ -232,6 +232,24 @@ else:
         st.session_state.current_email = None
         st.rerun()
 
+    # ---> THE ADMIN WIPE BUTTON (ADMIN ONLY) <---
+    # Replace "admin@demo.com" with the actual email you will use during the pitch
+    if st.session_state.current_email == "admin@demo.com": 
+        st.sidebar.divider()
+        with st.sidebar.expander("⚠️ Danger Zone: Reset App"):
+            st.error("Admin Warning: This will permanently delete all data.")
+            
+            confirm_wipe = st.checkbox("I confirm I want to wipe all data.")
+            
+            if confirm_wipe:
+                if st.button("🚨 PERMANENTLY RESET 🚨", use_container_width=True):
+                    import os 
+                    if os.path.exists(DB_FILE):
+                        os.remove(DB_FILE) 
+                    init_db() 
+                    st.session_state.clear() 
+                    st.rerun()
+
     # --- NEW: Global Public Directory Search ---
     st.sidebar.divider()
     st.sidebar.subheader("🔍 Public Directory / அடைவு")
