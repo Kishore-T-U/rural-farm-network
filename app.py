@@ -324,8 +324,27 @@ else:
                     st.write(f"📞 **Farmer Contact:** {a['farmer_name']} | Ph: {a['farmer_phone']} | Email: {a['farmer_email']}")
                     
                     # --- NEW: Downloadable Receipt ---
-                    receipt_text = f"GOVT RURAL PRODUCTION RECEIPT\nID: {a['id']}\nDate: {a['timestamp']}\nCrop: {a['crop']} ({a['qty']} KG)\nPrice: Rs.{a['price']}\n\nFARMER: {a['farmer_name']} ({a['farmer_phone']})\nCONSUMER: {a['consumer_name']} ({a['consumer_phone']})"
-                    st.download_button("📥 Download Official Receipt", data=receipt_text, file_name=f"Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_{a['id']}")
+                    # --- NEW: Official Bilingual Receipt ---
+                    receipt_text = f"""தமிழ்நாடு ஊரக உற்பத்தி ரசீது / GOVT RURAL PRODUCTION RECEIPT
+-------------------------------------------------------
+பரிவர்த்தனை எண் / Transaction ID: {a['id']}
+தேதி மற்றும் நேரம் / Date & Time: {a['timestamp']}
+
+பொருள் / Commodity: {a['crop']}
+அளவு / Quantity: {a['qty']} KG
+ஒப்பந்த விலை / Final Price: ₹{a['price']}
+
+விவசாயி விவரங்கள் / FARMER DETAILS:
+பெயர் / Name: {a['farmer_name']}
+எண் / Ph: {a['farmer_phone']}
+
+நுகர்வோர் விவரங்கள் / CONSUMER DETAILS:
+பெயர் / Name: {a['consumer_name']}
+எண் / Ph: {a['consumer_phone']}
+-------------------------------------------------------
+மின்-கையொப்பம் சரிபார்க்கப்பட்டது / e-Signature Verified"""
+
+                    st.download_button("📥 Download Receipt / ரசீதை பதிவிறக்குக", data=receipt_text, file_name=f"TN_Agri_Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_{a['id']}_unique")
                     
                     # --- NEW: Review System ---
                     with st.expander(f"Rate & Review Farmer: {a['farmer_name']}"):
@@ -412,9 +431,27 @@ else:
                         st.write(f"📞 **Consumer Contact:** {a['consumer_name']} | Ph: {a['consumer_phone']} | Email: {a['consumer_email']}")
                         
                         # Generate the identical downloadable receipt for the farmer
-                        receipt_text = f"GOVT RURAL PRODUCTION RECEIPT\nID: {a['id']}\nDate: {a['timestamp']}\nCrop: {a['crop']} ({a['qty']} KG)\nPrice: Rs.{a['price']}\n\nFARMER: {a['farmer_name']} ({a['farmer_phone']})\nCONSUMER: {a['consumer_name']} ({a['consumer_phone']})"
-                        st.download_button("📥 Download Official Receipt", data=receipt_text, file_name=f"Sale_Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_farm_{a['id']}")
+                        # --- NEW: Official Bilingual Receipt ---
+                        receipt_text = f"""தமிழ்நாடு ஊரக உற்பத்தி ரசீது / GOVT RURAL PRODUCTION RECEIPT
+-------------------------------------------------------
+பரிவர்த்தனை எண் / Transaction ID: {a['id']}
+தேதி மற்றும் நேரம் / Date & Time: {a['timestamp']}
 
+பொருள் / Commodity: {a['crop']}
+அளவு / Quantity: {a['qty']} KG
+ஒப்பந்த விலை / Final Price: ₹{a['price']}
+
+விவசாயி விவரங்கள் / FARMER DETAILS:
+பெயர் / Name: {a['farmer_name']}
+எண் / Ph: {a['farmer_phone']}
+
+நுகர்வோர் விவரங்கள் / CONSUMER DETAILS:
+பெயர் / Name: {a['consumer_name']}
+எண் / Ph: {a['consumer_phone']}
+-------------------------------------------------------
+மின்-கையொப்பம் சரிபார்க்கப்பட்டது / e-Signature Verified"""
+
+                        st.download_button("📥 Download Receipt / ரசீதை பதிவிறக்குக", data=receipt_text, file_name=f"TN_Agri_Receipt_{a['id']}.txt", mime="text/plain", key=f"dl_{a['id']}_unique")
         # TAB 2: Sowing Input
         with tabs[1]:
             st.header(t["sowing"])
