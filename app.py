@@ -728,16 +728,16 @@ else:
                 for truck in available_trucks:
                     st.info(f"**{truck['vehicle_name']}**")
                     st.caption(f"Reg No: {truck['vehicle_no']} | Capacity: {truck['capacity']} KG")
-                    st.write(f"Driver: {truck['owner_name']} | Rate: ₹{truck['rate']}")
                     
-                    if st.button(f"Book Truck (₹{truck['rate']})", key=f"book_trk_{truck['id']}"):
-                        # --- FIX 3: Change Status to Unavailable Immediately ---
+                    # --- FIX: Make the rate type explicit ---
+                    st.write(f"Driver: {truck['owner_name']} | **Rate: ₹{truck['rate']} / Trip (or Base Km)**")
+                    
+                    if st.button(f"Book Truck (₹{truck['rate']} Base)", key=f"book_trk_{truck['id']}"):
                         for t_idx, db_t in enumerate(db["transporters"]):
                             if db_t["id"] == truck["id"]:
                                 db["transporters"][t_idx]["status"] = "Unavailable"
                                 break
                                 
-                        # Log the booking
                         db["transport_bookings"].append({
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             "transporter_email": truck['owner_email'],
@@ -750,8 +750,7 @@ else:
                         })
                         save_db(db)
                         
-                        # Set a temporary session state variable to show the success message
-                        st.session_state.booking_success = f"✅ Booked! Driver Phone: {truck['owner_phone']}"
+                        st.session_state.booking_success = f"✅ Booked! Call Driver to finalize distance: {truck['owner_phone']}"
                         st.rerun()
                         
                         # Generate instant receipt/alert for the booker
