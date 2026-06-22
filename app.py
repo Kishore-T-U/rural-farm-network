@@ -473,39 +473,55 @@ else:
             st.subheader("Village Sowing Registry")
             st.table(db["sowing_data"])
 
-        # TAB 3: AI Prediction & State Analytics
-        # TAB 3: AI Prediction & State Analytics
+        # TAB 3: AI Prediction
         with tabs[2]:
             st.header(t["ai_predict"] + " (State-Level Integration)")
             st.write("Analyze localized sowing patterns strictly mapped to LGD codes and current climatic conditions to prevent market saturation.")
             
-            # --- API KEY UPDATE: Automatically pull from Streamlit Secrets ---
             try:
                 api_key = st.secrets["GEMINI_API_KEY"]
-                st.success("Secure Government AI Link Established.")
+                st.success("✅ Secure Government AI Link Established.")
             except:
                 api_key = None
                 st.error("API Key missing from Server Secrets.")
             
-            # 2. Local Government Directory (LGD) Integration for Tamil Nadu
-            # In a production app, this would be an API call to the national LGD database
-            tn_lgd_database = {
-                "274154": {"district": "Coimbatore", "panchayat": "Odanthurai", "soil_type": "Red Calcareous", "avg_rainfall_mm": 600},
-                "274189": {"district": "Erode", "panchayat": "Bhavani", "soil_type": "Alluvial", "avg_rainfall_mm": 700},
-                "275441": {"district": "Thanjavur", "panchayat": "Papanasam", "soil_type": "Deltaic Alluvium", "avg_rainfall_mm": 950},
-                "276211": {"district": "Madurai", "panchayat": "Melur", "soil_type": "Red Sandy", "avg_rainfall_mm": 850}
-            }
+            # --- DYNAMIC LGD API SIMULATOR ---
+            entered_lgd = st.text_input("Enter Target Panchayat (6-Digit LGD Code) / கிராம பஞ்சாயத்து LGD குறியீடு", value="274154")
             
-            selected_lgd = st.selectbox("Select Target Panchayat (LGD Code) / கிராம பஞ்சாயத்து LGD குறியீடு", list(tn_lgd_database.keys()))
-            location_data = tn_lgd_database[selected_lgd]
+            def fetch_lgd_details(code):
+                # Our known sample database
+                known_db = {
+                    "274154": {"district": "Coimbatore", "panchayat": "Odanthurai", "soil_type": "Red Calcareous", "temp": "28°C"},
+                    "274189": {"district": "Erode", "panchayat": "Bhavani", "soil_type": "Alluvial", "temp": "30°C"},
+                    "275441": {"district": "Thanjavur", "panchayat": "Papanasam", "soil_type": "Deltaic Alluvium", "temp": "32°C"},
+                    "276211": {"district": "Madurai", "panchayat": "Melur", "soil_type": "Red Sandy", "temp": "34°C"}
+                }
+                
+                # Check if it's a known code
+                if code in known_db:
+                    return known_db[code]
+                # If it's any other 6-digit number, simulate a successful API fetch for the demo
+                elif len(code) >= 5 and code.isdigit():
+                    return {
+                        "district": "TN Demo District", 
+                        "panchayat": f"Zone-{code}", 
+                        "soil_type": "Mixed Loam",
+                        "temp": "29°C"
+                    }
+                else:
+                    return None
             
-            st.info(f"📍 **Targeted Region:** {location_data['district']} District, {location_data['panchayat']} Panchayat | **Soil:** {location_data['soil_type']}")
+            location_data = fetch_lgd_details(entered_lgd)
+            
+            if location_data:
+                st.info(f"📍 **Targeted Region:** {location_data['district']} District, {location_data['panchayat']} Panchayat | **Soil:** {location_data['soil_type']}")
+            else:
+                st.error("⚠️ Invalid LGD Code. Please enter a valid 6-digit numerical code.")
 
-            # 3. Simulated Live Weather & Trend Data Integration
-            # In production, connect this to the Indian Meteorological Department (IMD) API
+            # Simulated Live Weather & Trend Data Integration
             current_weather = {
                 "forecast": "Expected heavy rainfall in the next 14 days.",
-                "temperature_trend": "Normal, averaging 28°C",
+                "temperature_trend": f"Normal, averaging {location_data['temp'] if location_data else '28°C'}",
                 "humidity": "75%"
             }
 
@@ -514,23 +530,22 @@ else:
                     st.error("Please provide your API key to authenticate the secure connection.")
                 elif not db["sowing_data"]:
                     st.warning("No live sowing data registered for this zone yet.")
+                elif not location_data:
+                    st.error("Please enter a valid LGD code before running the AI analysis.")
                 else:
                     try:
-                        # Configure the API securely using the user-provided key
                         genai.configure(api_key=api_key)
                         model = genai.GenerativeModel('gemini-1.5-flash')
                         
-                        # Filter database to only show data for the selected LGD code (simulated here by passing the whole DB for the prototype)
                         local_sowing_data = json.dumps(db['sowing_data'])
-                        historical_data = json.dumps([{"year": 2025, "crop": "Rice", "yield_per_acre": "2400 KG", "market_status": "Oversaturated"}]) # Mock historical data
+                        historical_data = json.dumps([{"year": 2025, "crop": "Rice", "yield_per_acre": "2400 KG", "market_status": "Oversaturated"}]) 
                         
-                        # 4. Anti-Hallucination Strict Prompting
                         prompt = f"""
                         You are a strict, data-driven agricultural analytics engine for the Government of Tamil Nadu. 
                         You must NOT hallucinate, guess, or provide generic farming advice. Base your entire response strictly on the data provided below.
                         
                         [INPUT DATA]
-                        LGD Code: {selected_lgd}
+                        LGD Code: {entered_lgd}
                         Location: {location_data['panchayat']}, {location_data['district']}
                         Soil Type: {location_data['soil_type']}
                         Current Live Sowing Data: {local_sowing_data}
@@ -546,13 +561,12 @@ else:
                         Provide a brief, professional Tamil translation of the conclusive guidance at the end.
                         """
                         
-                        with st.spinner(f"Analyzing encrypted data for LGD Code {selected_lgd}..."):
+                        with st.spinner(f"Analyzing encrypted data for LGD Code {entered_lgd}..."):
                             response = model.generate_content(prompt)
                             st.write(response.text)
                             
                     except Exception as e:
                         st.error(f"Secure Connection Failed or API Error: {e}")
-
 # ================= UNIVERSAL MACHINERY & TRANSPORT POOL (SIDEBAR) =================
     st.sidebar.divider()
     with st.sidebar.expander("🚜 Machinery & Transport Pool"):
