@@ -145,7 +145,14 @@ if st.session_state.current_email is None:
                         st.rerun()
 
 # --- MAIN DASHBOARD ---
+# --- MAIN DASHBOARD ---
 else:
+    # --- BUG FIX: Check if user exists in the fresh cloud database ---
+    if st.session_state.current_email not in db["users"]:
+        st.session_state.current_email = None
+        st.rerun()
+        
+    # If safe, proceed to load user info
     user_info = db["users"][st.session_state.current_email]
     st.sidebar.title(t["dashboard"])
     st.sidebar.success(f"👤 {user_info['name']} ({user_info['role']})")
