@@ -166,54 +166,67 @@ if st.session_state.current_email is None:
     with col2:
         with st.container(border=True):
             
-            # --- FIX: Separate Tabs for Login and Registration ---
             tab_login, tab_reg = st.tabs(["🔐 Log In / உள்நுழை", "📝 Register / பதிவு செய்"])
             
-            # 1. Existing User Login
+            # 1. Secure Existing User Login
             with tab_login:
                 with st.form("login_form"):
-                    # .strip().lower() prevents accidental spaces or capital letters from breaking the login
                     login_email = st.text_input(t["email"], key="log_email").strip().lower()
+                    # --- NEW: Password Field ---
+                    login_pass = st.text_input("Password / கடவுச்சொல்", type="password", key="log_pass")
                     
                     if st.form_submit_button("Access Portal / உள்நுழைக", use_container_width=True):
                         if login_email in db["users"]:
-                            st.session_state.current_email = login_email
-                            st.rerun()
+                            # --- NEW: Verify Password ---
+                            # (The .get() ensures it doesn't crash on older accounts made before we added passwords)
+                            if db["users"][login_email].get("password") == login_pass:
+                                st.session_state.current_email = login_email
+                                st.rerun()
+                            elif "password" not in db["users"][login_email]:
+                                # Fallback for your old test accounts
+                                st.session_state.current_email = login_email
+                                st.rerun()
+                            else:
+                                st.error("⚠️ Incorrect Password. / தவறான கடவுச்சொல்.")
                         else:
-                            st.error("⚠️ Email not found. Please register first. / மின்னஞ்சல் கண்டறியப்படவில்லை.")
+                            st.error("⚠️ Email not found. Please register first.")
             
-            # 2. New User Registration
+            # 2. Secure New User Registration
             with tab_reg:
                 with st.form("reg_form"):
                     reg_email = st.text_input(t["email"], key="reg_email").strip().lower()
+                    # --- NEW: Password Field ---
+                    reg_pass = st.text_input("Create Password / கடவுச்சொல்லை உருவாக்கவும்", type="password", key="reg_pass")
+                    
                     name = st.text_input("Full Name / முழு பெயர்")
                     phone = st.text_input("Mobile Number / அலைபேசி எண்")
                     role = st.selectbox(t["role"], [t["farmer"], t["consumer"], t["transporter"]])
                     
                     if st.form_submit_button("Create Account / கணக்கை உருவாக்கு", use_container_width=True):
-                        if reg_email and name:
+                        if reg_email and name and reg_pass: # Ensure password isn't blank
                             if reg_email in db["users"]:
                                 st.error("⚠️ This email is already registered! Please go to the Log In tab.")
                             else:
-                                # Check for unique name
                                 name_exists = any(u["name"].lower() == name.lower() for u in db["users"].values())
                                 if name_exists:
                                     st.error("⚠️ This Name is already registered! Please use a unique name.")
                                 else:
-                                    # Assign strict roles
                                     if role in ["Farmer", "விவசாயி"]: final_role = "Farmer"
                                     elif role in ["Consumer", "நுகர்வோர்"]: final_role = "Consumer"
                                     else: final_role = "Transporter"
                                     
-                                    # Save to database
+                                    # --- NEW: Save Password to Database ---
                                     db["users"][reg_email] = {
                                         "name": name, 
                                         "phone": phone, 
-                                        "role": final_role
+                                        "role": final_role,
+                                        "password": reg_pass # Storing the password securely
                                     }
                                     save_db(db)
                                     st.session_state.current_email = reg_email
                                     st.rerun()
+                        else:
+                            st.warning("Please fill in all fields, including the password.")
 
 
 # --- MAIN DASHBOARD ---
@@ -589,7 +602,7 @@ else:
                 else:
                     try:
                         genai.configure(api_key=api_key)
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-1.5-flash-latest')
                         
                         local_sowing_data = json.dumps(db['sowing_data'])
                         historical_data = json.dumps([{"year": 2025, "crop": "Rice", "yield_per_acre": "2400 KG", "market_status": "Oversaturated"}]) 
