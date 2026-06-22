@@ -715,6 +715,10 @@ else:
         st.sidebar.divider()
         with st.sidebar.expander("🚚 Hire Local Transporter"):
             st.write("Directly book private logistics for your goods.")
+
+            if "booking_success" in st.session_state:
+                st.sidebar.success(st.session_state.booking_success)
+                del st.session_state.booking_success # Clear it after showing
             
             available_trucks = [t for t in db.get("transporters", []) if t["status"] == "Available"]
             
