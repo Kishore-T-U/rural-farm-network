@@ -224,28 +224,60 @@ else:
                         if d["status"] == "Open":
                             st.info(f"⏳ Waiting for farmers: **{d['crop']}** ({d['qty']} KG) at ₹{d['price']}")
                         elif d["status"] == "Countered":
-                            # --- NEW: Show Farmer Rating on Counter Offer ---
+                            # Show Farmer Rating on Counter Offer
                             farmer_reviews = db.get("reviews", {}).get(d['farmer_email'], [])
                             rating_text = f"⭐ {sum(r['rating'] for r in farmer_reviews)/len(farmer_reviews):.1f} ({len(farmer_reviews)} Reviews)" if farmer_reviews else "No reviews yet"
                             
                             st.warning(f"🔄 **Counter-Offer!** Farmer {d['farmer_name']} [{rating_text}] offers ₹{d['price']} for {d['qty']} KG.")
-                            if st.button("Accept Farmer's Price", key=f"acc_{d['id']}"):
-                                for m_idx, main_d in enumerate(db["demands"]):
-                                    if main_d["id"] == d["id"]:
-                                        db["demands"][m_idx]["status"] = "Closed"
-                                        break
-                                
-                                # Fetch full contact details for both
-                                f_info = db["users"][d['farmer_email']]
-                                db["agreements"].append({
-                                    "id": f"AGR-{random.randint(10000, 99999)}",
-                                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    "consumer_email": d['consumer_email'], "consumer_name": d['consumer_name'], "consumer_phone": user_info['phone'],
-                                    "farmer_email": d['farmer_email'], "farmer_name": d['farmer_name'], "farmer_phone": f_info['phone'],
-                                    "crop": d['crop'], "qty": d['qty'], "price": d['price']
-                                })
-                                save_db(db)
-                                st.rerun()
+                            
+                            # Create 3 columns for Accept, Decline, and Counter
+                            colA, colB, colC = st.columns(3)
+                            
+                            with colA:
+                                if st.button("Accept Deal / ஏற்கவும்", key=f"acc_cnt_{d['id']}"):
+                                    for m_idx, main_d in enumerate(db["demands"]):
+                                        if main_d["id"] == d["id"]:
+                                            db["demands"][m_idx]["status"] = "Closed"
+                                            break
+                                    db["agreements"].append({
+                                        "id": f"AGR-{random.randint(10000, 99999)}",
+                                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        "consumer_email": d['consumer_email'],
+                                        "consumer_name": d['consumer_name'],
+                                        "consumer_phone": user_info['phone'],
+                                        "farmer_email": d['farmer_email'],
+                                        "farmer_name": d['farmer_name'],
+                                        "farmer_phone": db["users"][d['farmer_email']]['phone'],
+                                        "crop": d['crop'], "qty": d['qty'], "price": d['price']
+                                    })
+                                    save_db(db)
+                                    st.rerun()
+
+                            with colB:
+                                if st.button("Decline / நிராகரி", key=f"dec_{d['id']}"):
+                                    for m_idx, main_d in enumerate(db["demands"]):
+                                        if main_d["id"] == d["id"]:
+                                            # Reset to open market and clear the specific farmer
+                                            db["demands"][m_idx]["status"] = "Open"
+                                            db["demands"][m_idx]["farmer_email"] = ""
+                                            db["demands"][m_idx]["farmer_name"] = ""
+                                            break
+                                    save_db(db)
+                                    st.rerun()
+
+                            with colC:
+                                new_price = st.number_input("New Offer (₹)", min_value=1, value=d['price'] - 100, step=50, key=f"inp_cons_{d['id']}")
+                                if st.button("Send Counter / மாற்று விலை", key=f"cnt_cons_{d['id']}"):
+                                    for m_idx, main_d in enumerate(db["demands"]):
+                                        if main_d["id"] == d["id"]:
+                                            # Update price and return to open market for all farmers to see
+                                            db["demands"][m_idx]["price"] = new_price
+                                            db["demands"][m_idx]["status"] = "Open"
+                                            db["demands"][m_idx]["farmer_email"] = ""
+                                            db["demands"][m_idx]["farmer_name"] = ""
+                                            break
+                                    save_db(db)
+                                    st.rerun()
 
             st.divider()
             st.write("**Your Final Agreements / உங்கள் ஒப்பந்தங்கள்:**")
