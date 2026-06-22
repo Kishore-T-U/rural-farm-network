@@ -158,14 +158,23 @@ if st.session_state.current_email is None:
                 if st.form_submit_button(t["login"], use_container_width=True):
                     if email and name:
                         if email not in db["users"]:
-                            db["users"][email] = {
-                                "name": name, 
-                                "phone": phone, 
-                                "role": "Farmer" if role in ["Farmer", "விவசாயி"] else "Consumer"
-                            }
-                            save_db(db)
-                        st.session_state.current_email = email
-                        st.rerun()
+                            # --- NEW: Check for Unique Name ---
+                            name_exists = any(u["name"].lower() == name.lower() for u in db["users"].values())
+                            if name_exists:
+                                st.error("⚠️ This Name is already registered! Please use a unique name (e.g., 'Ravi - North').")
+                            else:
+                                db["users"][email] = {
+                                    "name": name, 
+                                    "phone": phone, 
+                                    "role": "Farmer" if role in ["Farmer", "விவசாயி"] else "Consumer"
+                                }
+                                save_db(db)
+                                st.session_state.current_email = email
+                                st.rerun()
+                        else:
+                            # Log in existing user
+                            st.session_state.current_email = email
+                            st.rerun()
 
 # --- MAIN DASHBOARD ---
 # --- MAIN DASHBOARD ---
@@ -183,6 +192,29 @@ else:
     if st.sidebar.button("Logout / வெளியேறு"):
         st.session_state.current_email = None
         st.rerun()
+
+    # --- NEW: Global Public Directory Search ---
+    st.sidebar.divider()
+    st.sidebar.subheader("🔍 Public Directory / அடைவு")
+    search_query = st.sidebar.text_input("Search users by name...")
+    if search_query:
+        results = [u for u in db["users"].values() if search_query.lower() in u["name"].lower()]
+        if results:
+            for r in results:
+                st.sidebar.info(f"👤 **{r['name']}** ({r['role']})")
+                # Show ratings if it is a farmer
+                if r['role'] == "Farmer":
+                    f_email = [email for email, data in db["users"].items() if data['name'] == r['name']][0]
+                    farmer_reviews = db.get("reviews", {}).get(f_email, [])
+                    if farmer_reviews:
+                        rating = sum(rev['rating'] for rev in farmer_reviews) / len(farmer_reviews)
+                        st.sidebar.caption(f"⭐ {rating:.1f} ({len(farmer_reviews)} Reviews)")
+                    else:
+                        st.sidebar.caption("No reviews yet.")
+        else:
+            st.sidebar.warning("No users found matching that name.")
+
+    
 
     # ================= CONSUMER VIEW =================
     if user_info["role"] == "Consumer":
