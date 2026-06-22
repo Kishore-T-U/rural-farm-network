@@ -6,6 +6,19 @@ import os
 import google.generativeai as genai
 from datetime import datetime
 
+# Load the database at the start of every interaction
+db = load_db()
+
+# --- NEW: SAFETY PATCH TO AUTO-UPDATE OLD DATABASES ---
+if "equipment" not in db:
+    db["equipment"] = [
+        {"id": 1, "type": "Tractor", "name": "Mahindra 575 DI", "available": 3, "rate": 800},
+        {"id": 2, "type": "Tractor", "name": "Swaraj 744 FE", "available": 1, "rate": 750},
+        {"id": 3, "type": "Goods Vehicle", "name": "Tata Ace (Chota Hathi)", "available": 4, "rate": 400},
+        {"id": 4, "type": "Goods Vehicle", "name": "Mahindra Bolero Pickup", "available": 2, "rate": 600}
+    ]
+    save_db(db)
+
 def translate_crop(crop_name):
     # Dictionary of common crops
     translations = {
